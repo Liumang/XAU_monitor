@@ -13,17 +13,14 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
-# Webhook
 WEBHOOK = os.environ.get("FEISHU_WEBHOOK")
 
-# 数据源URL
 RTJ_URL = "http://beijingrtj.com/admin/get_price5.php"
 TENCENT_URL = "https://qt.gtimg.cn/q=hf_GC"
 OKX_URL = "https://www.okx.com/api/v5/market/ticker?instId=XAU-USDT-SWAP"
 
 
 def fetch_rtj_gold():
-    """获取北京融通金黄金价格"""
     try:
         timestamp = int(datetime.now().timestamp() * 1000)
         url = f"{RTJ_URL}?t={timestamp}"
@@ -46,7 +43,6 @@ def fetch_rtj_gold():
 
 
 def fetch_tencent_gold():
-    """获取腾讯财经现货黄金价格 (COMEX黄金)"""
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(TENCENT_URL, headers=headers, timeout=15)
@@ -68,7 +64,6 @@ def fetch_tencent_gold():
 
 
 def fetch_okx_gold():
-    """获取 OKX XAU/USDT 永续合约价格"""
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(OKX_URL, headers=headers, timeout=15)
@@ -95,7 +90,6 @@ def fetch_okx_gold():
 
 
 def format_change(value, is_pct=False):
-    """格式化涨跌幅显示"""
     try:
         val = float(value)
         if val > 0:
@@ -109,7 +103,6 @@ def format_change(value, is_pct=False):
 
 
 def push_all_prices():
-    """获取所有价格并推送到飞书"""
     now = datetime.now().strftime("%H:%M")
     
     rtj = fetch_rtj_gold()
