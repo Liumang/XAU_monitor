@@ -128,8 +128,7 @@ def push_all_prices():
     else:
         lines.append(f"💰 OKX金: 获取失败")
     
-    msg = "
-".join(lines)
+    msg = "\n".join(lines)
     
     try:
         if WEBHOOK:
