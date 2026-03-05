@@ -7,7 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
-BINANCE_URL = "https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=XAUUSDT"
+BINANCE_URL = "https://gold-api.61710284.workers.dev/fapi/v1/ticker/24hr?symbol=XAUUSDT"
 WEBHOOK = os.environ.get("FEISHU_WEBHOOK")
 
 def push_gold_price():
