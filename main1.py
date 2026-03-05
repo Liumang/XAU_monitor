@@ -53,7 +53,6 @@ def fetch_tencent_gold():
         response.encoding = 'gbk'
         text = response.text
         
-        # 解析格式: v_hf_GC="5108.91,-0.50,5111.80,5113.50,5204.30,5085.50,21:25:10..."
         match = re.search(r'v_hf_GC="([^"]+)"', text)
         if match:
             data = match.group(1).split(',')
@@ -113,20 +112,67 @@ def push_all_prices():
     """获取所有价格并推送到飞书"""
     now = datetime.now().strftime("%H:%M")
     
-    # 并行获取三个数据源
     rtj = fetch_rtj_gold()
     tencent = fetch_tencent_gold()
     okx = fetch_okx_gold()
     
-    # 构建消息
     lines = [f"⏰ {now}"]
     
-    # 融通金
     if rtj['success']:
         lines.append(f"💰 融通金: {rtj['price']}元/g")
     else:
-        lines.append(f"💰 融通金: 获取失败 ({rtj.get('error', '未知错误')})")
+        lines.append(f"💰 融通金: 获取失败")
     
-    # 现货黄金（腾讯）
     if tencent['success']:
         change_str = format_change(tencent['change_pct'], is_pct=True)
+        lines.append(f"💰 现货金: {tencent['price']}美元/oz {change_str}")
+    else:
+        lines.append(f"💰 现货金: 获取失败")
+    
+    if okx['success']:
+        emoji = "📈" if okx['change'] >= 0 else "📉"
+        lines.append(f"💰 OKX金: {okx['price']} USDT {emoji} {okx['change']:+.2f} ({okx['change_pct']:+.2f}%)")
+    else:
+        lines.append(f"💰 OKX金: 获取失败")
+    
+    msg = "
+".join(lines)
+    
+    try:
+        if WEBHOOK:
+            payload = {
+                "msg_type": "text",
+                "content": {"text": f"【金价监控】
+{msg}"}
+            }
+            resp = requests.post(WEBHOOK, json=payload, timeout=10)
+            print(f"[{now}] 推送成功: {resp.status_code}")
+        else:
+            print("错误: 未设置 FEISHU_WEBHOOK")
+    except Exception as e:
+        print(f"推送失败: {e}")
+    
+    print(msg)
+
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(push_all_prices, 'cron', minute='0,15,30,45')
+scheduler.add_job(push_all_prices, 'date', run_date=datetime.now())
+scheduler.start()
+print(f"[{datetime.now()}] 合并版金价监控已启动")
+
+
+@app.route('/')
+def health_check():
+    return {"status": "running", "version": "main1.py", "time": datetime.now().isoformat()}
+
+
+@app.route('/trigger')
+def manual_trigger():
+    push_all_prices()
+    return {"status": "triggered"}
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
