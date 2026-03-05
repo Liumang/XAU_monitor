@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-合并版金价监控 - 融通金 + 现货黄金 + OKX
+Railway 金价监控 - 现货金 + OKX
 """
 
 import os
@@ -13,26 +13,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 app = Flask(__name__)
 WEBHOOK = os.environ.get("FEISHU_WEBHOOK")
 
-RTJ_URL = "http://beijingrtj.com/admin/get_price5.php"
 TENCENT_URL = "https://qt.gtimg.cn/q=hf_GC"
 OKX_URL = "https://www.okx.com/api/v5/market/ticker?instId=XAU-USDT-SWAP"
-
-def fetch_rtj_gold():
-    try:
-        timestamp = int(datetime.now().timestamp() * 1000)
-        url = f"{RTJ_URL}?t={timestamp}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Referer': 'http://beijingrtj.com/index.php'
-        }
-        response = requests.get(url, headers=headers, timeout=15)
-        response.encoding = 'utf-8'
-        data = response.text.strip().split(',')
-        if len(data) >= 16:
-            return {'price': data[2], 'success': True}
-        return {'success': False}
-    except:
-        return {'success': False}
 
 def fetch_tencent_gold():
     try:
@@ -69,16 +51,10 @@ def fetch_okx_gold():
 
 def push_all_prices():
     now = datetime.now().strftime("%H:%M")
-    rtj = fetch_rtj_gold()
     tencent = fetch_tencent_gold()
     okx = fetch_okx_gold()
     
     lines = [f"⏰ {now}"]
-    
-    if rtj['success']:
-        lines.append(f"💰 融通金: {rtj['price']}元/g")
-    else:
-        lines.append(f"💰 融通金: 获取失败")
     
     if tencent['success']:
         val = float(tencent['change_pct'])
