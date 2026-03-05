@@ -1,48 +1,57 @@
 import os
 import requests
-import json
 from datetime import datetime
 from flask import Flask
 from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
-BINANCE_URL = "https://gold-api.61710284.workers.dev/fapi/v1/ticker/24hr?symbol=XAUUSDT"
+# OKX API - XAU/USDT 永续合约
+OKX_URL = "https://www.okx.com/api/v5/market/ticker?instId=XAU-USDT-SWAP"
 WEBHOOK = os.environ.get("FEISHU_WEBHOOK")
 
 def push_gold_price():
-    """获取币安金价并推送到飞书"""
-    print(f"[{datetime.now()}] 开始获取币安 XAU/USDT 数据...")
+    print(f"[{datetime.now()}] 开始获取 OKX XAU/USDT 数据...")
     
     try:
-        r = requests.get(BINANCE_URL, timeout=15)
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        r = requests.get(OKX_URL, headers=headers, timeout=15)
         r.raise_for_status()
-        d = r.json()
+        result = r.json()
         
-        price = float(d.get("lastPrice", "0"))
-        change = float(d.get("priceChange", "0"))
-        change_pct = float(d.get("priceChangePercent", "0"))
-        high = float(d.get("highPrice", "0"))
-        low = float(d.get("lowPrice", "0"))
+        if result.get('code') != '0':
+            raise Exception(f"OKX API 错误: {result.get('msg')}")
         
-        print(f"获取成功: 价格={price}, 涨跌={change_pct}%")
+        data = result.get('data', [{}])[0]
         
-        if price == 0:
-            msg = "【币安XAU/USDT】数据异常"
+        last_price = float(data.get('last', '0'))
+        open_24h = float(data.get('open24h', '0'))
+        high_24h = float(data.get('high24h', '0'))
+        low_24h = float(data.get('low24h', '0'))
+        vol_24h = float(data.get('vol24h', '0'))
+        
+        price_change = last_price - open_24h if open_24h > 0 else 0
+        change_pct = (price_change / open_24h * 100) if open_24h > 0 else 0
+        
+        print(f"获取成功: 价格={last_price}, 涨跌={change_pct:.2f}%")
+        
+        if last_price == 0:
+            msg = "【OKX XAU/USDT】数据异常"
         else:
-            emoji = "📈" if change >= 0 else "📉"
+            emoji = "📈" if price_change >= 0 else "📉"
             msg = f"""⏰ {datetime.now().strftime("%H:%M")}
-📊 币安 XAU/USDT 永续:
-   最新价: {price:.2f} USDT
-   涨跌: {emoji} {change:+.2f} ({change_pct:+.2f}%)
-   最高: {high:.2f} / 最低: {low:.2f}"""
+📊 OKX XAU/USDT 永续:
+   最新价: {last_price:.2f} USDT
+   涨跌: {emoji} {price_change:+.2f} ({change_pct:+.2f}%)
+   最高: {high_24h:.2f} / 最低: {low_24h:.2f}
+   成交量: {vol_24h:.4f} XAU"""
     except Exception as e:
-        msg = f"【币安XAU/USDT】数据获取失败: {str(e)}"
+        msg = f"【OKX XAU/USDT】数据获取失败: {str(e)}"
         print(f"获取失败: {e}")
     
     try:
         if WEBHOOK:
-            payload = {"msg_type": "text", "content": {"text": f"【币安黄金监控】\n{msg}"}}
+            payload = {"msg_type": "text", "content": {"text": f"【黄金监控 - OKX】\n{msg}"}}
             resp = requests.post(WEBHOOK, json=payload, timeout=10)
             print(f"推送成功: {resp.status_code}")
         else:
@@ -50,30 +59,18 @@ def push_gold_price():
     except Exception as e:
         print(f"推送失败: {e}")
 
-# 创建定时任务调度器
 scheduler = BackgroundScheduler()
-
-# 每15分钟执行一次
 scheduler.add_job(push_gold_price, 'cron', minute='0,15,30,45')
-
-# 启动时立即执行一次
 scheduler.add_job(push_gold_price, 'date', run_date=datetime.now())
-
 scheduler.start()
-print(f"[{datetime.now()}] 定时任务已启动，每15分钟推送一次币安金价")
+print(f"[{datetime.now()}] 定时任务已启动，每15分钟推送一次 OKX 金价")
 
 @app.route('/')
 def health_check():
-    """健康检查端点"""
-    return {
-        "status": "running",
-        "service": "gold-monitor",
-        "time": datetime.now().isoformat()
-    }
+    return {"status": "running", "service": "gold-monitor-okx", "time": datetime.now().isoformat()}
 
 @app.route('/trigger')
 def manual_trigger():
-    """手动触发推送"""
     push_gold_price()
     return {"status": "triggered"}
 
