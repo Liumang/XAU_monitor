@@ -3,7 +3,7 @@ import requests
 import json
 from datetime import datetime
 
-BINANCE_URL = "https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=XAUUSDT"
+BINANCE_URL = "https://gold-api.61710284.workers.dev/fapi/v1/ticker/24hr?symbol=XAUUSDT"
 WEBHOOK = os.environ.get("FEISHU_WEBHOOK")
 
 def main():
